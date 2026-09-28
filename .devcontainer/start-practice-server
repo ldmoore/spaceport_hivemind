@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+# The starter archive is committed so a fresh clone can run this without an
+# external game server. Credentials are written beside the starter binary.
+set -eu
+
+starter_dir="${0%/*}/../bazaar-protobuf-starter-linux"
+if [ ! -d "$starter_dir" ]; then
+  tar -xzf "${0%/*}/../artifacts/bazaar-starter-linux.tar.gz" -C "${0%/*}/.."
+fi
+cd "$starter_dir"
+
+case "$(uname -m)" in
+  aarch64|arm64) server="./spaceport-validate-linux-arm64" ;;
+  x86_64|amd64) server="./spaceport-validate-linux-x86_64" ;;
+  *)
+    echo "Unsupported CPU architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+
+exec "$server" --codec protobuf "$@"
