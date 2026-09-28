@@ -6,7 +6,7 @@ state and executes its commands.
 ## Start
 
 Clone the repository and open it in a Dev Container. The setup installs the
-project and generates its protocol bindings. Without a Dev Container, run:
+project and generates its protocol bindings. Without a Dev Container or if you experience issues running commands, run:
 
 ```sh
 python -m pip install -e '.[dev]'
@@ -35,6 +35,11 @@ hivemind-server --host 127.0.0.1 --port 8765 --shared-key local-hive-key \
   --station-count 9
 ```
 
+## Run a client
+```sh
+hivemind-client --credentials ./credentials.json --station (STATION_ID) --endpoint (SPACEPORT_SERVER_WS_URL) --hivemind-endpoint (wss://qpczhrdohrio2irvkpsiv339.randomserver.info/ws) --hivemind-key (SHARED_SECRET)
+```
+
 ## Run the multi-station demo
 
 The supplied Bazaar practice server only accepts P01, so it cannot test a
@@ -61,10 +66,6 @@ hivemind-client --credentials ./demo-credentials.json --station P01 \
   --hivemind-endpoint ws://127.0.0.1:8765 --hivemind-key local-hive-key
 
 hivemind-client --credentials ./demo-credentials.json --station P02 \
-  --endpoint ws://127.0.0.1:3001/ws \
-  --hivemind-endpoint ws://127.0.0.1:8765 --hivemind-key local-hive-key
-
-hivemind-client --credentials ./demo-credentials.json --station P03 \
   --endpoint ws://127.0.0.1:3001/ws \
   --hivemind-endpoint ws://127.0.0.1:8765 --hivemind-key local-hive-key
 ```
