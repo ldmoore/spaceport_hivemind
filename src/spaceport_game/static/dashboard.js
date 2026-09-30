@@ -86,6 +86,28 @@ $('#start').addEventListener('click', async () => {
   } catch (error) { $('#notice').textContent = error.message; }
   finally { busy = false; render(); }
 });
+$('#reset').addEventListener('click', async () => {
+  if (!confirm('Reset the simulation? This clears the current tick, trades, and resource budgets. Connected planets will return to the lobby.')) return;
+  const button = $('#reset'); button.disabled = true; $('#notice').textContent = 'Resetting simulation…';
+  let socket;
+  try {
+    await new Promise((resolve, reject) => {
+      socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/control/reset`, 'bazaar.protobuf.v2');
+      let replied = false;
+      const timer = setTimeout(() => { socket.close(); reject(new Error('Reset request timed out')); }, 8000);
+      socket.onopen = () => socket.send('{}');
+      socket.onmessage = event => {
+        replied = true; clearTimeout(timer);
+        const result = JSON.parse(event.data); socket.close();
+        if (result.error) reject(new Error(result.error)); else resolve();
+      };
+      socket.onclose = () => { clearTimeout(timer); if (!replied) reject(new Error('Unable to connect to engine')); };
+    });
+    $('#notice').textContent = 'Fresh lobby ready. Connected clients were asked to confirm readiness again.';
+    await refresh();
+  } catch (error) { $('#notice').textContent = error.message; }
+  finally { button.disabled = false; }
+});
 refresh(); setInterval(refresh, 2000);
 
 $('#tick-speed').addEventListener('input', () => { $('#tick-speed').dataset.edited = 'true'; });

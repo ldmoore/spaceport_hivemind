@@ -60,6 +60,9 @@ class HivemindClient:
             message = await game.receive()
             kind = message.WhichOneof("message")
             if kind == "state":
+                if self.run_id != message.state.run_id:
+                    self.run_id = message.state.run_id
+                    await game.send_ready(message.state.run_id, message.state.snapshot_sequence)
                 self.run_id = message.state.run_id
                 await self._send_observation(hive, message.state)
             elif kind == "result":

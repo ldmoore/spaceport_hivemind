@@ -3,3 +3,4 @@
 .speed-control{display:flex;align-items:center;flex-wrap:wrap;gap:16px;padding:20px;border:1px solid #253344;border-radius:12px;margin-bottom:24px;background:#0d1824}.speed-control label{font-size:14px}.speed-control p{font-size:11px;color:#93a5b9}.speed-control input{width:85px;background:#060b14;color:#e8eef8;border:1px solid #557080;border-radius:6px;padding:10px}.speed-control span{font-size:12px;color:#99e6d2}
 
 #surplus{background:#060b14;color:#bfe8dc;border:1px solid #557080;border-radius:8px;padding:12px;font:inherit}#budget-note,#budget-summary{width:100%;margin:0;font-size:12px;color:#9eb2c7;line-height:1.6}
+.game-actions{display:flex;gap:10px;align-items:center}.game-actions #reset{background:transparent;color:#bad1df;border-color:#405568}.game-actions #reset:hover:not(:disabled){background:#182837;color:#f1f7fc}@media(max-width:650px){.game-actions{width:100%}.game-actions button{flex:1}}

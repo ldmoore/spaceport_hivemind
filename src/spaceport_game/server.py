@@ -134,6 +134,7 @@ class DemoBazaar:
     _ready_to_run: asyncio.Event = field(default_factory=asyncio.Event)
     start_requested: asyncio.Event = field(default_factory=asyncio.Event)
     finished: asyncio.Event = field(default_factory=asyncio.Event)
+    tick_task: asyncio.Task | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if len(self.station_ids) < 2:
@@ -323,6 +324,36 @@ class DemoBazaar:
             self.phase = "RUNNING"
             self.world_version += 1
             self._ready_to_run.set()
+        await self.broadcast_state()
+
+    async def reset(self) -> None:
+        """Start a fresh lobby while keeping authenticated sockets and tokens."""
+        if self.tick_task is not None and not self.tick_task.done():
+            self.tick_task.cancel()
+        async with self._lock:
+            self.run_id = f"demo-{secrets.token_hex(6)}"
+            self.tick = 0
+            self.world_version += 1
+            self.phase = "READY"
+            self.offers.clear()
+            self.participants.clear()
+            self.resource_budget.clear()
+            self.surplus_percent = 0
+            self._offer_sequence = 0
+            self._transaction_sequence = 0
+            self.snapshot_sequences = {station_id: 0 for station_id in self.connections}
+            station_ids = list(self.stations)
+            for index, station_id in enumerate(station_ids):
+                old = self.stations[station_id]
+                self.stations[station_id] = DemoStation(
+                    station_id=station_id,
+                    token=old.token,
+                    inventory=self._starting_inventory(index),
+                    specialty=RESOURCES[index % len(RESOURCES)],
+                )
+            self._ready_to_run = asyncio.Event()
+            self.finished = asyncio.Event()
+        self.tick_task = asyncio.create_task(self.run_ticks())
         await self.broadcast_state()
 
     def randomize_resources(self) -> None:
@@ -588,6 +619,14 @@ class DemoBazaarServer:
         self.world = world
 
     async def handler(self, socket: ServerConnection) -> None:
+        if urlsplit(socket.request.path).path == "/control/reset":
+            try:
+                await asyncio.wait_for(socket.recv(), 5)
+                await self.world.reset()
+                await socket.send(json.dumps({"phase": self.world.phase, "tick": self.world.tick}))
+            except asyncio.TimeoutError:
+                await socket.send(json.dumps({"error": "Reset request timed out"}))
+            return
         if urlsplit(socket.request.path).path == "/control/start":
             try:
                 settings = json.loads(await asyncio.wait_for(socket.recv(), 5))
@@ -650,15 +689,17 @@ async def run(host: str, port: int, credential_file: Path, station_ids: tuple[st
         station.token = tokens[station_id]
     LOG.info("Station credentials loaded from %s", credential_file)
     server = DemoBazaarServer(world)
-    tick_task = asyncio.create_task(world.run_ticks())
+    world.tick_task = asyncio.create_task(world.run_ticks())
     try:
         async with serve(server.handler, host, port, subprotocols=[SUBPROTOCOL], max_size=2**20, process_request=http_handler):
             LOG.info("Demo Bazaar listening on ws://%s:%d/ws; waiting for %d ready stations", host, port, len(station_ids))
             await asyncio.get_running_loop().create_future()
     finally:
-        tick_task.cancel()
+        if world.tick_task is not None:
+            world.tick_task.cancel()
         with suppress(asyncio.CancelledError):
-            await tick_task
+            if world.tick_task is not None:
+                await world.tick_task
 
 
 def main() -> None:
