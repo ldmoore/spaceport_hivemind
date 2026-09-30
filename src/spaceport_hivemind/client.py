@@ -60,6 +60,9 @@ class HivemindClient:
             message = await game.receive()
             kind = message.WhichOneof("message")
             if kind == "state":
+                if self.run_id != message.state.run_id:
+                    self.run_id = message.state.run_id
+                    await game.send_ready(message.state.run_id, message.state.snapshot_sequence)
                 self.run_id = message.state.run_id
                 await self._send_observation(hive, message.state)
             elif kind == "result":
@@ -113,9 +116,16 @@ def main() -> None:
     parser.add_argument("--credentials", type=Path, required=True)
     parser.add_argument("--station", required=True)
     parser.add_argument("--hivemind-endpoint", default="ws://127.0.0.1:8765")
-    parser.add_argument("--hivemind-key", default=None)
+    parser.add_argument("--hivemind-key", default=None, help="Override hivemind_key from the credentials JSON")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    try:
+        credentials = json.loads(args.credentials.read_text())
+        shared_key = args.hivemind_key if args.hivemind_key is not None else credentials.get("hivemind_key")
+        if shared_key is not None and (not isinstance(shared_key, str) or not shared_key.strip()):
+            parser.error("hivemind_key must be a nonempty string")
+    except (OSError, ValueError, AttributeError):
+        parser.error("Unable to read credentials JSON object")
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s")
     game = GameConfig.from_credentials(args.credentials, args.endpoint, args.station)
-    asyncio.run(HivemindClient(game, HiveConfig(args.hivemind_endpoint, args.hivemind_key)).run())
+    asyncio.run(HivemindClient(game, HiveConfig(args.hivemind_endpoint, shared_key)).run())

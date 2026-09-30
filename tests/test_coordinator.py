@@ -354,3 +354,24 @@ def test_hive_does_not_accept_an_offer_at_its_exclusive_expiry_tick() -> None:
 
     assert hive.ingest(donor) == []
     assert hive.ingest(recipient) == []
+
+
+def test_automatic_roster_trades_without_waiting_for_18_and_excludes_offline():
+    hive = Coordinator(CoordinatorConfig(reserve_ticks=2, expected_station_count=0))
+    hive.active_station_ids = {'P01', 'P02'}
+    donor = _planet('P01', inventory={'water':12,'food':4,'components':4}, upkeep={'water':2,'food':1,'components':1})
+    receiver = _planet('P02', inventory={'water':0,'food':4,'components':4}, upkeep={'water':2,'food':1,'components':1})
+    assert hive.ingest(donor) == []
+    assert hive.ingest(receiver)
+    hive.active_station_ids.remove('P02')
+    newer = _planet('P01', inventory={'water':12,'food':4,'components':4}, upkeep={'water':2,'food':1,'components':1}, tick=8)
+    assert hive.ingest(newer) == []
+
+
+def test_station_count_bounds():
+    import pytest
+    for count in [0, 1, 18, 20]:
+        assert CoordinatorConfig(expected_station_count=count).expected_station_count == count
+    for count in [-1, 21]:
+        with pytest.raises(ValueError):
+            CoordinatorConfig(expected_station_count=count)

@@ -194,7 +194,7 @@ class DemoBazaar:
             await self._result(station_id, command.request_id, False, "RESULT_CODE_INVALID_ARGUMENT")
             return
         await self._result(station_id, command.request_id, True, "RESULT_CODE_OK", object_id=offer.offer_id)
-        await self.broadcast_state()
+        await self.broadcast_state((offer.proposer_id, offer.recipient_id))
 
     async def _accept(self, station_id: str, command: Any) -> None:
         async with self._lock:
@@ -229,7 +229,7 @@ class DemoBazaar:
             await self._result(station_id, command.request_id, False, "RESULT_CODE_NOT_OPEN")
             return
         await self._result(station_id, command.request_id, True, "RESULT_CODE_OK", object_id=offer.offer_id, transaction_id=offer.transaction_id)
-        await self.broadcast_state()
+        await self.broadcast_state((offer.proposer_id, offer.recipient_id))
 
     async def _withdraw(self, station_id: str, command: Any) -> None:
         # The demo has no advertisements; offer withdrawal is useful for bridge smoke tests.
@@ -245,7 +245,7 @@ class DemoBazaar:
             await self._result(station_id, command.request_id, False, "RESULT_CODE_NOT_FOUND")
             return
         await self._result(station_id, command.request_id, True, "RESULT_CODE_OK", object_id=offer.offer_id)
-        await self.broadcast_state()
+        await self.broadcast_state((offer.proposer_id, offer.recipient_id))
 
     def _can_trade(self, station_id: str, command: Any) -> bool:
         station = self.stations[station_id]
@@ -258,9 +258,10 @@ class DemoBazaar:
     def _bundle_from_proto(value: Any) -> dict[str, int]:
         return {name: int(getattr(value, name)) for name in ("water", "food", "components")}
 
-    async def broadcast_state(self) -> None:
+    async def broadcast_state(self, recipients: tuple[str, ...] | None = None) -> None:
         for station_id, socket in tuple(self.connections.items()):
-            await self._send_state(station_id, socket)
+            if recipients is None or station_id in recipients:
+                await self._send_state(station_id, socket)
 
     async def run_ticks(self) -> None:
         """Wait for all bridges, then advance the shared simulation clock."""
@@ -361,6 +362,10 @@ class DemoBazaar:
         state.transactions.SetInParent()
         state.request_results.SetInParent()
         for item in self.offers:
+            # Like Bazaar, each station receives its own offers and trades.
+            # Sending the entire fleet history to every bridge grows quadratically.
+            if station_id not in (item.proposer_id, item.recipient_id):
+                continue
             target = state.offers.items.add()
             target.offer_id = item.offer_id
             target.proposer_id = item.proposer_id

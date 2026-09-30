@@ -4,3 +4,10 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 demo-credentials.json
+my-credentials.json
+.env
+classroom-credentials.json
+team-*-credentials.json
+Spaceport_Bazaar/
+scratch/
+reports/
