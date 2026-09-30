@@ -24,6 +24,7 @@ hivemind-server = "spaceport_hivemind.server:main"
 hivemind-client = "spaceport_hivemind.client:main"
 hivemind-demo-server = "spaceport_hivemind.demo_server:main"
 hivemind-demo = "spaceport_hivemind.demo:main"
+bazaar-game-server = "spaceport_game.server:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,3 +32,7 @@ asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+spaceport_hivemind = ["static/*.html", "static/*.css", "static/*.js"]
+spaceport_game = ["static/*.html", "static/*.css", "static/*.js"]

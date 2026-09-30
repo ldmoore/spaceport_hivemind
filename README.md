@@ -1,5 +1,7 @@
 # Spaceport Hivemind
 
+**Joining as a team?** Follow [Getting started](GETTING_STARTED.md) to install the client, configure your private credentials, and connect to the hosted engine or the teacher's server and Hivemind.
+
 The Hivemind Server decides trades; each `hivemind-client` only forwards game
 state and executes its commands.
 

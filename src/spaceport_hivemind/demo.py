@@ -13,7 +13,7 @@ from typing import Any
 from websockets.asyncio.server import serve
 
 from .client import HiveConfig, HivemindClient
-from .coordinator import Coordinator, CoordinatorConfig
+from .coordinator import Coordinator, CoordinatorConfig, MAX_STATIONS
 from .demo_server import DemoBazaar, DemoBazaarServer, DemoOffer
 from .game import GameConfig
 from .server import HivemindServer
@@ -84,6 +84,7 @@ async def run_demo(
     tick_duration_ms: int = 20,
     reserve_ticks: int = 4,
     timeout_seconds: float = 10,
+    hive: HivemindServer | None = None,
 ) -> DemoResult:
     """Exercise the actual two-WebSocket bridge stack and return its outcome.
 
@@ -91,8 +92,10 @@ async def run_demo(
     can rerun the demo while changing the coordinator without stale processes
     or credential files affecting the next result.
     """
+    if not 2 <= len(station_ids) <= MAX_STATIONS or len(set(station_ids)) != len(station_ids):
+        raise ValueError("Demo requires 2–20 distinct station IDs")
     world = DemoBazaar(station_ids, duration_ticks=duration_ticks, tick_duration_ms=tick_duration_ms)
-    hive = HivemindServer(
+    hive = hive or HivemindServer(
         Coordinator(CoordinatorConfig(expected_station_count=len(station_ids), reserve_ticks=reserve_ticks)),
         SHARED_KEY,
     )
@@ -110,7 +113,7 @@ async def run_demo(
                     bridge = asyncio.create_task(
                         HivemindClient(
                             GameConfig(game_endpoint, station_id, world.stations[station_id].token),
-                            HiveConfig(hive_endpoint, SHARED_KEY),
+                            HiveConfig(hive_endpoint, hive.shared_key),
                         ).run(),
                         name=f"bridge-{station_id}",
                     )
@@ -129,7 +132,10 @@ async def run_demo(
                 await asyncio.wait_for(world.finished.wait(), timeout=timeout_seconds)
                 # The final state has been broadcast. Let bridges forward it
                 # before their sockets are closed during cleanup.
-                await asyncio.sleep(0)
+                await _wait_until(
+                    lambda: all(hive.coordinator.planets[s].phase == "FINISHED" for s in station_ids),
+                    timeout_seconds,
+                )
                 return result_from(world)
     finally:
         for task in bridges:
@@ -153,8 +159,8 @@ def main() -> None:
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     station_ids = tuple(item.strip() for item in args.stations.split(",") if item.strip())
-    if len(station_ids) < 2 or len(set(station_ids)) != len(station_ids):
-        parser.error("--stations must name at least two distinct stations")
+    if not 2 <= len(station_ids) <= MAX_STATIONS or len(set(station_ids)) != len(station_ids):
+        parser.error("--stations must name 2–20 distinct stations")
     if args.duration_ticks < 1 or args.tick_duration_ms < 1 or args.timeout_seconds <= 0:
         parser.error("duration, tick duration, and timeout must be positive")
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING, format="%(levelname)s %(message)s")

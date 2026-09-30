@@ -7,7 +7,10 @@
   "remoteEnv": {
     "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}"
   },
-  "forwardPorts": [3001, 8765],
+  "forwardPorts": [
+    3001,
+    8765
+  ],
   "portsAttributes": {
     "3001": {
       "label": "Bazaar practice server",
@@ -18,13 +21,15 @@
       "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "rm -rf .venv && python3 -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -e '.[dev]' && make PYTHON=.venv/bin/python generate && (test -d bazaar-protobuf-starter-linux || tar -xzf artifacts/bazaar-starter-linux.tar.gz) && chmod +x .devcontainer/start-practice-server bazaar-protobuf-starter-linux/spaceport-validate-linux-arm64 bazaar-protobuf-starter-linux/spaceport-validate-linux-x86_64",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
         "python.testing.pytestEnabled": true,
-        "python.testing.pytestArgs": ["tests"]
+        "python.testing.pytestArgs": [
+          "tests"
+        ]
       },
       "extensions": [
         "zxh404.vscode-proto3",

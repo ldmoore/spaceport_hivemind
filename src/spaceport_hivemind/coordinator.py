@@ -7,6 +7,8 @@ from itertools import count
 
 from .model import Bundle, Command, Offer, Planet, RESOURCES
 
+MAX_STATIONS = 20
+
 
 @dataclass(frozen=True)
 class CoordinatorConfig:
@@ -25,8 +27,8 @@ class CoordinatorConfig:
     def __post_init__(self) -> None:
         if self.reserve_ticks < 0:
             raise ValueError("reserve_ticks must not be negative")
-        if self.expected_station_count < 1:
-            raise ValueError("expected_station_count must be at least one")
+        if not 0 <= self.expected_station_count <= MAX_STATIONS:
+            raise ValueError("expected_station_count must be 0 (automatic) or between 1 and 20")
         if self.offer_ttl_ticks is not None and self.offer_ttl_ticks < 1:
             raise ValueError("offer_ttl_ticks must be positive or None")
 
@@ -43,6 +45,7 @@ class Coordinator:
     def __init__(self, config: CoordinatorConfig | None = None) -> None:
         self.config = config or CoordinatorConfig()
         self.planets: dict[str, Planet] = {}
+        self.active_station_ids: set[str] | None = None
         self._sequence = count(1)
         self._issued: set[tuple[str, str, int]] = set()
         self._pending_bilateral_recipients: set[tuple[str, int]] = set()
@@ -60,18 +63,20 @@ class Coordinator:
         return self._plan(planet.run_id)
 
     def _plan(self, run_id: str) -> list[Command]:
-        # Do not make a partial-roster allocation while bridges are still
-        # connecting. A failed station remains registered, so the remaining
-        # eligible stations can still be aided after that permanent failure.
+        # Fixed mode waits for its quorum; automatic mode uses the connected
+        # roster. Retained snapshots of offline stations aren't spendable.
         registered = sorted(
-            (item for item in self.planets.values() if item.run_id == run_id),
+            (item for item in self.planets.values() if item.run_id == run_id and item.snapshot_sequence > 0
+             and (self.active_station_ids is None or item.station_id in self.active_station_ids)),
             key=lambda item: item.station_id,
         )
         if len(registered) < self.config.expected_station_count:
             return []
+        if self.config.expected_station_count == 0 and self.active_station_ids is not None and len(registered) < len(self.active_station_ids):
+            return []
         planets = sorted(
             (
-                item for item in self.planets.values()
+                item for item in registered
                 if item.run_id == run_id and item.phase == "RUNNING" and not item.failed_once
             ),
             key=lambda item: item.station_id,
